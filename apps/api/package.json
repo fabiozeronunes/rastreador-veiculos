@@ -1,0 +1,26 @@
+{
+  "name": "rastreador-veiculos-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "setup-db": "node --experimental-sqlite packages/db/src/migrate.js && node packages/fipe/src/sync.js",
+    "seed-sources": "node -e \"import('packages/scrapers/src/sources.js').then(m=>m.seedSources(getDb()))\""
+  },
+  "dependencies": {
+    "next": "^14.2.4",
+    "react": "^18",
+    "react-dom": "^18",
+    "@rv/db": "file:../packages/db",
+    "@rv/fipe": "file:../packages/fipe",
+    "@rv/scrapers": "file:../packages/scrapers",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
