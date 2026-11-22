@@ -78,6 +78,44 @@ async function getFacets() {
 
 const BRL = (v) => (v == null ? '—' : `R$ ${Number(v).toLocaleString('pt-BR')}`);
 
+function AggregatorStatus({ sources }) {
+  const total = sources.length;
+  const enabled = sources.filter(s => s.enabled).length;
+  const byKind = {
+    auction: sources.filter(s => s.kind === 'auction').length,
+    classified: sources.filter(s => s.kind === 'classified').length,
+    repass: sources.filter(s => s.kind === 'repass').length,
+  };
+  return (
+    <div
+      style={{
+        background: '#e8f4fd',
+        border: '1px solid #b3e5fc',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 20,
+        fontSize: 13,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span>📡 Agregador de Leilões e Repasses</span>
+        <span style={{ fontWeight: 700, color: '#002f51' }}>{total} fontes • {enabled} ativas</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 12 }}>
+        <div>
+          <strong>{byKind.auction}</strong> Leilão
+        </div>
+        <div>
+          <strong>{byKind.classified}</strong> Classificados
+        </div>
+        <div>
+          <strong>{byKind.repass}</strong> Repasse
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WhatsAppButton({ phone, title }) {
   const text = encodeURIComponent(`Olá! Vi seu anúncio: ${title || 'veículo'}`);
   return (

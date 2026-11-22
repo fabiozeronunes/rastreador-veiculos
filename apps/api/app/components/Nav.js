@@ -6,6 +6,7 @@ const LINKS = [
   { href: '/', label: '📋 Oportunidades', match: (p) => p === '/' },
   { href: '/consultar', label: '🔍 Consultar veículo', match: (p) => p.startsWith('/consultar') },
   { href: '/favoritos', label: '★ Favoritos', match: (p) => p.startsWith('/favoritos') },
+  { href: '/importar', label: '📥 Importar Planilha', match: (p) => p.startsWith('/importar') },
 ];
 
 export default function Nav() {
