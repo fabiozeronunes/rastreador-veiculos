@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import FavoriteButton from './components/FavoriteButton';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +32,10 @@ async function getListings(filters) {
     }
     if (filters.fav) {
       where.push('l.favorite = 1');
+    }
+    if (filters.vehicle_type) {
+      where.push('l.vehicle_type = ?');
+      params.push(filters.vehicle_type);
     }
     if (filters.q) {
       where.push('(l.title LIKE ? OR l.brand LIKE ? OR l.model LIKE ?)');
@@ -141,7 +146,7 @@ function WhatsAppButton({ phone, title }) {
   );
 }
 
-function Card({ l, threshold }) {
+function Card({ l, threshold, onDetail }) {
   const discount = l.discount_pct;
   const hot = discount != null && discount >= threshold;
   const auction = l.source_kind === 'auction';
@@ -153,6 +158,8 @@ function Card({ l, threshold }) {
       ? { text: 'Leilão', color: '#ff5c00' }
       : { text: 'Classificado', color: '#00a0af' };
 
+  const handleDetail = () => onDetail && onDetail(l);
+
   return (
     <div
       style={{
@@ -163,7 +170,9 @@ function Card({ l, threshold }) {
         borderRadius: 8,
         overflow: 'hidden',
         transition: 'box-shadow .15s',
+        cursor: 'pointer',
       }}
+      onClick={handleDetail}
     >
       {/* imagem + link */}
       <a href={l.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
@@ -328,6 +337,8 @@ export default async function Home({ searchParams }) {
     fav: searchParams?.fav === '1',
   };
 
+  const [showDetail, setShowDetail] = useState(null);
+
   const [listings, facets] = await Promise.all([getListings(filters), getFacets()]);
   const threshold = Number(process.env.DISCOUNT_MIN) || 30;
 
@@ -395,6 +406,16 @@ export default async function Home({ searchParams }) {
               <option value="auction">Leilão</option>
               <option value="repass">Repasse</option>
               <option value="classified">Classificado</option>
+            </select>
+          </label>
+
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>
+            Veículo
+            <select name="vehicle_type" defaultValue={filters.vehicle_type} style={{ ...select, marginTop: 4 }}>
+              <option value="">Todos</option>
+              <option value="carro">Carro</option>
+              <option value="SUV">SUV</option>
+              <option value="pickup">Pickup</option>
             </select>
           </label>
 
@@ -532,7 +553,7 @@ export default async function Home({ searchParams }) {
             }}
           >
             {listings.map((l) => (
-              <Card key={l.id} l={l} threshold={threshold} />
+              <Card key={l.id} l={l} threshold={threshold} onDetail={showDetail} />
             ))}
           </div>
         )}
@@ -662,5 +683,142 @@ export default async function Home({ searchParams }) {
         </footer>
       </div>
     </main>
+
+    {/* Modal de detalhes do veículo */}
+    {showDetail && (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0,0,0,0.8)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 12,
+            width: '90%',
+            maxWidth: 800,
+            maxHeight: '90%',
+            overflow: 'auto',
+            animation: 'fadeIn .3s ease',
+          }}
+        >
+          <div
+            style={{
+              background: '#002f51',
+color: '#fff',
+padding: '20px',
+borderRadius: 12,
+12,
+display: 'flex',
+justifyContent: 'space-between',
+alignItems: 'center',
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 20 }}>
+              📋 Detalhes do Veículo
+            </h3>
+            <button
+              onClick={() => setShowDetail(null)}
+              style={{
+                background: 'transparent',
+                border: 0,
+                color: '#fff',
+                fontSize: 18,
+                cursor: 'pointer',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div style={{ padding: 20 }}>
+            <p style={{ fontSize: 16, marginBottom: 12 }}>
+              <strong>{showDetail.brand} {showDetail.model}</strong>{' '}
+              {showDetail.year !== null && <span>({showDetail.year})</span>}
+            </p>
+
+            <p style={{ margin: '8px 0', fontSize: 14 }}>
+              <strong>Preço:</strong> {BRL(showDetail.price)}
+            </p>
+
+            {showDetail.fipe_price != null && (
+              <p style={{ margin: '8px 0', fontSize: 14 }}>
+                <strong>FIPE:</strong> {BRL(showDetail.fipe_price)}
+                <span style={{
+                  marginLeft: 8,
+                  fontSize: 12,
+                  color: showDetail.discount >= 30 ? '#2e9e44' : '#d93025',
+                }}>
+                  {showDetail.discount}% {'}
+                  {showDetail.discount >= 30 ? 'abaixo' : 'acima'} FIPE
+                </span>
+              </p>
+            )}
+
+            <p style={{ margin: '8px 0', fontSize: 14 }}>
+              <strong>Desconto:</strong> {showDetail.discount != null ? showDetail.discount + '%' : 'N/A'}
+            </p>
+
+            <p style={{ margin: '8px 0', fontSize: 14 }}>
+              <strong>Tipo:</strong> {showDetail.vehicle_type || 'carro'}
+            </p>
+
+            <p style={{ margin: '8px 0', fontSize: 14 }}>
+              <strong>Fonte:</strong> {showDetail.source_name}
+            </p>
+
+            {showDetail.plate && (
+              <p style={{ margin: '8px 0', fontSize: 14 }}>
+                <strong>Placa:</strong> {showDetail.plate}
+              </p>
+            )}
+
+            {showDetail.image && (
+              <img
+                src={showDetail.image}
+                alt={showDetail.title || ''}
+                style={{
+                  width: '100%',
+                  maxWidth: 500,
+                  margin: '16px 0',
+                  borderRadius: 8,
+                  objectFit: 'cover',
+                }}
+              />
+            )}
+
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e6e6e6' }}>
+              <a
+                href={showDetail.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  background: '#ff5c00',
+                  color: '#fff',
+                  border: 0,
+                  borderRadius: 6,
+                  padding: '12px 24px',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                }}
+              >
+                🔗 Ir ao site
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
   );
 }

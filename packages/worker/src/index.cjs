@@ -78,7 +78,18 @@ async function runScrapeCycle() {
       const phone = extractPhone(html);
       const plate = extractPlate(html);
 
-      const example = {
+      // Classificar tipo de veículo baseado no modelo
+function classifyVehicleType(model) {
+  if (!model) return 'carro';
+  const m = model.trim().toUpperCase();
+  const pickupKeywords = ['SAVEIRO', 'RANGER', 'HILUX', 'STRADA', 'AMAROK', 'PICKUP'];
+  const suvKeywords = ['HR-V', 'CR-V', 'RAV4', 'ESCAPE', 'SPORTAGE', 'TUCSON', 'CX-5', 'CRETA'];
+  for (const k of pickupKeywords) if (m.includes(k)) return 'pickup';
+  for (const k of suvKeywords) if (m.includes(k)) return 'SUV';
+  return 'carro';
+}
+
+const example = {
         source_id: src.id,
         external_id: src.id + '-' + (new Date().getTime() % 10000),
         url: src.base_url + '/veiculo/' + new Date().getTime(),
@@ -88,6 +99,7 @@ async function runScrapeCycle() {
         version: '',
         year: year,
         price: price,
+        vehicle_type: classifyVehicleType(model),  // ← adicionado
         raw: { html, strategy },
         image: image,
         phone: phone,
