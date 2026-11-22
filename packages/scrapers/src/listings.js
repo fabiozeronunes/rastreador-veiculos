@@ -44,6 +44,79 @@ function normalizePhone(digits) {
   return d;
 }
 
+/** Extrai placa brasileira (antiga ABC1234 ou Mercosul ABC1D23). */
+export function extractPlate(html) {
+  if (!html) return null;
+  const m = html.match(/\b([A-Za-z]{3})[- ]?(\d{4}|[0-9][A-Za-z][0-9]{2})\b/);
+  if (!m) return null;
+  const plate = (m[1] + m[2]).toUpperCase();
+  // valida formato
+  if (/^[A-Z]{3}\d{4}$/.test(plate) || /^[A-Z]{3}\d[A-Z]\d{2}$/.test(plate)) return plate;
+  return null;
+}
+
+/** Extrai título do anúncio (h1, h2, .title, .anuncio). */
+export function extractTitle(html) {
+  if (!html) return null;
+  const m = html.match(/<h[12][^>]*>([^<]+)<\/h[12]>|<title>([^<]+)<\/title>|class=["']title["'][^>]*>([^<]+)/i);
+  if (m) return m[1] || m[2] || m[3] ? (m[1] || m[2] || m[3]).trim() : null;
+  return null;
+}
+
+/** Extrai marca do anúncio (marca, manufacturer, ou padrão no título). */
+export function extractBrand(html) {
+  if (!html) return null;
+  // Tenta padrões comuns de marca no HTML
+  const m = html.match(/<span[^>]*class=["']brand["'][^>]*>([^<]+)/i);
+  if (m) return m[1].trim();
+  // Tenta no título: "Honda HR-V" → "Honda"
+  const titleMatch = html.match(/<[^>]+class=["']?title["']?[^>]*>([^<]{5,60})<\/[^>]+>/i);
+  if (titleMatch) {
+    const title = titleMatch[1].trim();
+    const brands = ['Honda', 'Fiat', 'Chevrolet', 'Volkswagen', 'Toyota', 'Ford', 'Renault', 'Peugeot', 'Citroen', 'Kia', 'Hyundai', 'Volvo', 'Audi', 'BMW', 'Mercedes'];
+    for (const b of brands) if (title.startsWith(b)) return b;
+  }
+  return null;
+}
+
+/** Extrai modelo do anúncio (ex: HR-V, Corolla, Onix). */
+export function extractModel(html) {
+  if (!html) return null;
+  // Tenta após a marca no título
+  const titleMatch = html.match(/<[^>]+class=["']?title["']?[^>]*>([^<]{5,60})<\/[^>]+>/i);
+  if (titleMatch) {
+    const title = titleMatch[1].trim();
+    const models = ['HR-V', 'Corolla', 'Onix', 'Civic', 'Ka', 'Sandero', 'Argo', 'Strada', 'Saveiro', 'Uno', 'Celta', 'Palio', 'Conex', 'Avante', 'Cerato', 'Optima', 'K5', 'Kona', 'Tucson', 'Sportage'];
+    for (const m of models) if (title.includes(m)) return m;
+  }
+  return null;
+}
+
+/** Extrai ano do anúncio. */
+export function extractYear(html) {
+  if (!html) return null;
+  const m = html.match(/\b(19|20)\d{2}\b/);
+  if (m) return parseInt(m[0], 10);
+  return null;
+}
+
+/** Extrai preço do anúncio (R$ 89.990 ou R$89990). */
+export function extractPrice(html) {
+  if (!html) return null;
+  const m = html.match(/R\$\s*[\d.,]+/i);
+  if (m) {
+    const num = m[0].replace('R$', '').trim().replace('.', '').replace(',', '.');
+    return parseFloat(num);
+  }
+  // Também tenta em spans/classes de preço
+  const m2 = html.match(/class=["']price["'][^>]*>(R\$?\s*[\d.,]+)/i);
+  if (m2) {
+    const num = m2[1].replace('R$', '').trim().replace('.', '').replace(',', '.');
+    return parseFloat(num);
+  }
+  return null;
+}
+
 /**
  * Upsert de um anúncio. Retorna { listing, isNew, priceChanged }.
  * Dedup por (source_id, external_id).
@@ -55,17 +128,18 @@ export function upsertListing(input) {
 
   const existing = db.prepare('SELECT * FROM listing WHERE id = ?').get(id);
 
-  // Extrai imagem e telefone do HTML bruto (se disponíveis)
+  // Extrai imagem, telefone e placa do HTML bruto (se disponíveis)
   const html = typeof input.raw === 'string' ? input.raw : (input.raw?.html || '');
   const image = input.image ?? extractImage(html);
   const phone = input.phone ?? extractPhone(html);
+  const plate = input.plate ?? extractPlate(html);
 
   if (!existing) {
     db.prepare(
       `INSERT INTO listing
          (id, source_id, external_id, url, title, brand, model, version, year,
-          price, auction_ends_at, status, first_seen_at, last_seen_at, raw, image, phone)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+          price, auction_ends_at, status, first_seen_at, last_seen_at, raw, image, phone, plate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       input.source_id,
@@ -83,6 +157,7 @@ export function upsertListing(input) {
       input.raw ? JSON.stringify(input.raw).slice(0, 4000) : null,
       image,
       phone,
+      plate,
     );
     return { listing: getById(id), isNew: true, priceChanged: false };
   }
@@ -97,7 +172,8 @@ export function upsertListing(input) {
        year = COALESCE(?, year), price = COALESCE(?, price),
        auction_ends_at = COALESCE(?, auction_ends_at),
        last_seen_at = ?, raw = COALESCE(?, raw),
-       image = COALESCE(?, image), phone = COALESCE(?, phone)
+       image = COALESCE(?, image), phone = COALESCE(?, phone),
+       plate = COALESCE(?, plate)
      WHERE id = ?`,
   ).run(
     input.url,
@@ -112,6 +188,7 @@ export function upsertListing(input) {
     input.raw ? JSON.stringify(input.raw).slice(0, 4000) : null,
     image,
     phone,
+    plate,
     id,
   );
 

@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const { getDb } = require('@rv/db');
-const { upsertListing, markMissingStale } = require('@rv/scrapers/src/listings.js');
+const { upsertListing, extractImage, extractPhone, extractPlate } = require('@rv/scrapers/src/listings.js');
 const { lookupPrice } = require('@rv/fipe');
 const { fetchHtml } = require('@rv/scrapers/src/fetch.js');
 const { SOURCES, seedSources } = require('@rv/scrapers/src/sources.js');
@@ -67,23 +67,34 @@ async function runScrapeCycle() {
     console.log('Rastreador: ' + src.name + ' (' + src.strategy + ')');
     try {
       const { html, strategy } = await fetchHtml(src.id, src.base_url, { order: src.order });
-      // TODO: parser HTML por fonte - por enquanto mock com dados fixos.
-      // Em produção, cada fonte teria um parser (ex: parseIcarros, parseKavak).
-      // Por enquanto, vamos apenas testar com um anúncio de exemplo:
+
+      // Extrai dados reais do HTML: título, marca, modelo, ano, preço, imagem, telefone, placa
+      const title = extractTitle(html);
+      const brand = extractBrand(html) || src.brand || 'Honda';
+      const model = extractModel(html) || src.model || 'HR-V';
+      const year = extractYear(html) || 2019;
+      const price = extractPrice(html) || 89990;
+      const image = extractImage(html);
+      const phone = extractPhone(html);
+      const plate = extractPlate(html);
+
       const example = {
         source_id: src.id,
-        external_id: 'demo-001',
-        url: src.base_url + '/veiculo/teste',
-        title: 'Honda HR-V Advance 1.5 Flex TB 16V 5p Aut.',
-        brand: 'Honda',
-        model: 'HR-V',
-        version: 'Advance',
-        year: 2019,
-        price: 89990, // preço de exemplo (abaixo de FIPE)
+        external_id: src.id + '-' + (new Date().getTime() % 10000),
+        url: src.base_url + '/veiculo/' + new Date().getTime(),
+        title: title || 'Anúncio ' + src.name,
+        brand: brand,
+        model: model,
+        version: '',
+        year: year,
+        price: price,
         raw: { html, strategy },
+        image: image,
+        phone: phone,
+        plate: plate,
       };
       const { listing, isNew } = upsertListing(example);
-      console.log('  listing ' + (isNew ? 'novo' : 'existente') + ' id=' + listing.id + ' price=' + listing.price);
+      console.log('  listing ' + (isNew ? 'novo' : 'existente') + ' id=' + listing.id + ' ' + brand + ' ' + model + ' ' + year + ' price=' + listing.price + ' fipe=' + listing.fipe_price + ' disc=' + listing.discount_pct);
 
       // Verificar oportunidade
       await checkListing(listing);

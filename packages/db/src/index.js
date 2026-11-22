@@ -141,6 +141,16 @@ function migrate(db) {
   addListingCol('image', 'TEXT');        // URL da foto do anúncio
   addListingCol('phone', 'TEXT');        // WhatsApp/telefone (E.164 com 55)
   addListingCol('favorite', 'INTEGER NOT NULL DEFAULT 0');
+  addListingCol('plate', 'TEXT');        // placa extraída do anúncio
+
+  // --- Relatórios de consulta veicular (cache) ---
+  db.exec(`CREATE TABLE IF NOT EXISTS vehicle_report (
+     plate TEXT NOT NULL,
+     provider TEXT NOT NULL,            -- fipe | checkauto
+     result TEXT,                       -- JSON do resultado
+     checked_at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY (plate, provider)
+  )`);
 }
 
 export default getDb;

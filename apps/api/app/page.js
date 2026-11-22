@@ -216,6 +216,25 @@ function Card({ l, threshold }) {
 
         <div style={{ fontSize: 13, color: '#666' }}>
           {l.year ?? '—'} · {l.title || ''}
+          {l.plate ? (
+            <>
+              {' · '}
+              <span
+                style={{
+                  background: '#eef2ff',
+                  border: '1px solid #c7d2fe',
+                  borderRadius: 4,
+                  padding: '1px 6px',
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  color: '#3730a3',
+                  fontSize: 12,
+                }}
+              >
+                {l.plate}
+              </span>
+            </>
+          ) : null}
         </div>
 
         <div
@@ -234,13 +253,27 @@ function Card({ l, threshold }) {
           <span>{l.auction_ends_at ? `até ${l.auction_ends_at}` : ''}</span>
         </div>
 
-        {/* ações: favorito + whatsapp */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingTop: 4 }}>
+        {/* ações: favorito + whatsapp + consulta */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingTop: 4, flexWrap: 'wrap' }}>
           <FavoriteButton id={l.id} initial={l.favorite} />
+          <a
+            href={l.plate ? `/consultar?placa=${l.plate}` : '/consultar'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              background: '#002f51',
+              color: '#fff',
+              borderRadius: 6,
+              padding: '6px 10px',
+              fontSize: 13,
+              fontWeight: 700,
+              textDecoration: 'none',
+            }}
+          >
+            🔍 Consultar
+          </a>
           {l.phone && <WhatsAppButton phone={l.phone} title={`${l.brand} ${l.model} ${l.version || ''}`} />}
-          {!l.phone && (
-            <span style={{ fontSize: 12, color: '#aaa' }}>sem contato</span>
-          )}
         </div>
       </div>
     </div>
@@ -280,9 +313,25 @@ export default async function Home({ searchParams }) {
               Veículos abaixo do FIPE · desconto mínimo {threshold}%
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', fontSize: 13, opacity: 0.85 }}>
-            {listings.length} anúncio(s)
-            {filters.fav ? ' · só favoritos' : ''}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <a
+              href={filters.fav ? '/' : '/?fav=1'}
+              style={{
+                background: filters.fav ? '#ff5c00' : 'rgba(255,255,255,.15)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,.4)',
+                borderRadius: 20,
+                padding: '6px 14px',
+                fontSize: 13,
+                fontWeight: 700,
+                textDecoration: 'none',
+              }}
+            >
+              ★ Favoritos {filters.fav ? '✓' : ''}
+            </a>
+            <span style={{ fontSize: 13, opacity: 0.85 }}>
+              {listings.length} anúncio(s)
+            </span>
           </div>
         </div>
       </header>
@@ -375,7 +424,7 @@ export default async function Home({ searchParams }) {
               defaultChecked={filters.fav}
               style={{ width: 18, height: 18, accentColor: '#ff5c00' }}
             />
-            ★ Favoritos
+            ★ Só favoritos
           </label>
 
           <div style={{ display: 'flex', gap: 8 }}>
