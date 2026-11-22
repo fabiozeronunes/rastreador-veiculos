@@ -1,17 +1,7 @@
-import { consultVehicle } from '../../lib/consult.js';
+import { consultVehicle, CHECK_DEFS, CHECK_CATEGORIES } from '../../lib/consult.js';
 import PlateInput from '../components/PlateInput';
 
 export const dynamic = 'force-dynamic';
-
-const CHECK_LABELS = {
-  multa: 'Multa / débitos',
-  ipva: 'IPVA',
-  leilao: 'Oferta em leilão',
-  monta: 'Monta / sinistro',
-  gravame: 'Gravame',
-  roubo: 'Roubo e furto',
-  recall: 'Recall',
-};
 
 const STATUS_STYLE = {
   ok: { bg: '#e6f4ea', color: '#1e7e34', text: '✅ Sem pendência' },
@@ -28,13 +18,23 @@ function Badge({ status }) {
         background: s.bg,
         color: s.color,
         fontWeight: 700,
-        fontSize: 13,
-        padding: '4px 10px',
+        fontSize: 12,
+        padding: '3px 10px',
         borderRadius: 12,
         whiteSpace: 'nowrap',
       }}
     >
       {s.text}
+    </span>
+  );
+}
+
+// Renderiza valor para checks que retornam dado (qtd proprietário, KM, FIPE)
+function ValueDisplay({ value, unit }) {
+  if (value == null) return <Badge status="unknown" />;
+  return (
+    <span style={{ fontSize: 14, fontWeight: 700, color: '#002f51' }}>
+      {value}{unit ? ` ${unit}` : ''}
     </span>
   );
 }
@@ -46,13 +46,20 @@ export default async function ConsultarPage({ searchParams }) {
 
   const ufs = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
 
+  // Agrupa checks por categoria
+  const grouped = {};
+  for (const def of CHECK_DEFS) {
+    if (!grouped[def.category]) grouped[def.category] = [];
+    grouped[def.category].push(def);
+  }
+
   return (
     <main style={{ fontFamily: 'system-ui, sans-serif', background: '#f5f5f5', minHeight: '100vh' }}>
       <header style={{ background: '#002f51', color: '#fff', padding: '16px 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>🔍 Consulta veicular</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>🔍 Consulta veicular completa</div>
           <div style={{ fontSize: 13, opacity: 0.85 }}>
-            FIPE por placa · multa · monta · leilão · IPVA · gravame
+            {CHECK_DEFS.length} verificações · FIPE por placa · links Detran
           </div>
         </div>
       </header>
@@ -70,7 +77,6 @@ export default async function ConsultarPage({ searchParams }) {
             display: 'flex',
             flexDirection: 'column',
             gap: 16,
-            alignItems: 'stretch',
           }}
         >
           <label style={{ fontSize: 15, fontWeight: 700, color: '#002f51', display: 'block' }}>
@@ -97,13 +103,12 @@ export default async function ConsultarPage({ searchParams }) {
                   fontSize: 15,
                   boxSizing: 'border-box',
                   background: '#fff',
+                  marginTop: 4,
                 }}
               >
                 <option value="">—</option>
                 {ufs.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
+                  <option key={u} value={u}>{u}</option>
                 ))}
               </select>
             </label>
@@ -128,7 +133,7 @@ export default async function ConsultarPage({ searchParams }) {
           </div>
         </form>
 
-        {/* resultado */}
+        {/* resultado: erro */}
         {run && !run.ok && (
           <div
             style={{
@@ -145,105 +150,161 @@ export default async function ConsultarPage({ searchParams }) {
           </div>
         )}
 
+        {/* resultado: sucesso */}
         {run && run.ok && (
           <>
-            {/* FIPE */}
+            {/* FIPE por placa */}
             <section
               style={{
                 background: '#fff',
-                border: '1px solid #e6e6e6',
-                borderRadius: 8,
-                padding: 16,
+                border: '2px solid #e6e6e6',
+                borderRadius: 12,
+                padding: 20,
                 marginTop: 16,
               }}
             >
-              <h2 style={{ fontSize: 16, margin: '0 0 8px', color: '#002f51' }}>
-                🚗 FIPE por placa <span style={{ fontWeight: 400, color: '#888' }}>({run.plate})</span>
+              <h2 style={{ fontSize: 17, margin: '0 0 10px', color: '#002f51' }}>
+                🚗 FIPE por placa
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    fontWeight: 800,
+                    marginLeft: 8,
+                    background: '#eef2ff',
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    fontSize: 15,
+                  }}
+                >
+                  {run.plate}
+                </span>
               </h2>
               {run.fipe.ok ? (
-                <div style={{ fontSize: 14, lineHeight: 1.8 }}>
+                <div style={{ fontSize: 15, lineHeight: 1.8 }}>
                   <strong>{run.fipe.brand} {run.fipe.model}</strong> {run.fipe.version || ''}
                   <br />
                   Ano: {run.fipe.year || '—'} · Código FIPE: {run.fipe.fipeCode || '—'}
                 </div>
               ) : (
                 <div style={{ fontSize: 14, color: '#888' }}>
-                  FIPE por placa indisponível agora ({run.fipe.error}). Consulte manual em{' '}
+                  FIPE por placa indisponível ({run.fipe.error}). Manual:{' '}
                   <a href="https://placas.fipe.org.br" target="_blank" rel="noopener noreferrer">
                     placas.fipe.org.br
                   </a>
-                  .
                 </div>
               )}
             </section>
 
-            {/* checks */}
+            {/* 20 verificações agrupadas */}
             <section
               style={{
                 background: '#fff',
-                border: '1px solid #e6e6e6',
-                borderRadius: 8,
-                padding: 16,
+                border: '2px solid #e6e6e6',
+                borderRadius: 12,
+                padding: 20,
                 marginTop: 16,
               }}
             >
-              <h2 style={{ fontSize: 16, margin: '0 0 12px', color: '#002f51' }}>
-                📋 Situação do veículo
+              <h2 style={{ fontSize: 17, margin: '0 0 4px', color: '#002f51' }}>
+                📋 Relatório completo — {CHECK_DEFS.length} verificações
               </h2>
-              <div style={{ display: 'grid', gap: 8 }}>
-                {Object.keys(CHECK_LABELS).map((key) => (
-                  <div
-                    key={key}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '10px 12px',
-                      background: '#fafafa',
-                      borderRadius: 6,
-                      border: '1px solid #f0f0f0',
-                      gap: 12,
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>{CHECK_LABELS[key]}</span>
-                    <Badge status={run.checks[key]} />
-                  </div>
-                ))}
-              </div>
-
               {run.provider === 'unconfigured' && (
                 <div
                   style={{
-                    marginTop: 14,
                     background: '#fff8e1',
                     border: '1px solid #ffe082',
                     borderRadius: 6,
-                    padding: 12,
+                    padding: 10,
                     fontSize: 13,
-                    lineHeight: 1.6,
+                    marginBottom: 14,
                   }}
                 >
-                  <strong>💡 Como ativar dados reais:</strong> {run.providerHowto}
-                  <br />
+                  <strong>⚙️ Provider não configurado.</strong> {run.providerHowto}{' '}
                   <a href={run.providerManualUrl} target="_blank" rel="noopener noreferrer">
                     Consultar manualmente no CheckAuto →
                   </a>
                 </div>
               )}
+
+              {Object.entries(grouped).map(([cat, defs]) => {
+                const meta = CHECK_CATEGORIES[cat] || { label: cat, color: '#666' };
+                return (
+                  <div key={cat} style={{ marginBottom: 18 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 8,
+                        borderBottom: `2px solid ${meta.color}22`,
+                        paddingBottom: 6,
+                      }}
+                    >
+                      <span
+                        style={{
+                          background: meta.color,
+                          color: '#fff',
+                          fontSize: 11,
+                          fontWeight: 800,
+                          padding: '3px 10px',
+                          borderRadius: 4,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {meta.label}
+                      </span>
+                      <span style={{ fontSize: 12, color: '#999' }}>{defs.length} itens</span>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      {defs.map((def) => {
+                        const st = run.checks[def.key];
+                        const isValue = ['qtd_proprietarios', 'historico_consultas', 'historico_km', 'precificador_fipe'].includes(def.key);
+                        return (
+                          <div
+                            key={def.key}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '8px 12px',
+                              background: '#fafafa',
+                              borderRadius: 6,
+                              border: '1px solid #f0f0f0',
+                              gap: 10,
+                            }}
+                          >
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>
+                              {def.label}
+                            </span>
+                            {isValue ? (
+                              <ValueDisplay
+                                value={st === 'unconfigured' || st === 'unknown' ? null : st}
+                                unit={def.key === 'historico_km' ? 'km' : def.key === 'precificador_fipe' ? '' : ''}
+                              />
+                            ) : (
+                              <Badge status={st} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </section>
 
-            {/* Detran */}
+            {/* Detran / links manuais */}
             <section
               style={{
                 background: '#fff',
-                border: '1px solid #e6e6e6',
-                borderRadius: 8,
-                padding: 16,
+                border: '2px solid #e6e6e6',
+                borderRadius: 12,
+                padding: 20,
                 marginTop: 16,
               }}
             >
-              <h2 style={{ fontSize: 16, margin: '0 0 8px', color: '#002f51' }}>
+              <h2 style={{ fontSize: 17, margin: '0 0 10px', color: '#002f51' }}>
                 🏛️ Consultas manuais (grátis)
               </h2>
               {run.detran.manual ? (
@@ -252,20 +313,10 @@ export default async function ConsultarPage({ searchParams }) {
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <a
-                    href={run.detran.multa}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={linkBtn('#00a0af')}
-                  >
+                  <a href={run.detran.multa} target="_blank" rel="noopener noreferrer" style={linkBtn('#00a0af')}>
                     Multas Detran-{run.detran.uf}
                   </a>
-                  <a
-                    href={run.detran.ipva}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={linkBtn('#7b2ff7')}
-                  >
+                  <a href={run.detran.ipva} target="_blank" rel="noopener noreferrer" style={linkBtn('#7b2ff7')}>
                     IPVA {run.detran.uf}
                   </a>
                   <a
@@ -282,29 +333,32 @@ export default async function ConsultarPage({ searchParams }) {
 
             <div style={{ fontSize: 12, color: '#999', marginTop: 16 }}>
               Consultado em {new Date(run.checkedAt).toLocaleString('pt-BR')} ·
-              FIPE placa: grátis · CheckAuto: serviço pago de terceiros
+              FIPE placa: grátis · Relatório completo: CheckAuto (serviço pago de terceiros)
             </div>
           </>
         )}
 
+        {/* estado vazio */}
         {!run && (
           <div
             style={{
               background: '#fff',
-              border: '1px dashed #ccc',
-              borderRadius: 8,
-              padding: 40,
+              border: '2px dashed #ccc',
+              borderRadius: 12,
+              padding: 48,
               textAlign: 'center',
               color: '#777',
               marginTop: 16,
             }}
           >
-            <div style={{ fontSize: 36 }}>🔎</div>
-            <div style={{ fontWeight: 600, marginTop: 8 }}>
+            <div style={{ fontSize: 48 }}>🔎</div>
+            <div style={{ fontSize: 18, fontWeight: 700, marginTop: 10 }}>
               Digite a placa para consultar
             </div>
-            <div style={{ fontSize: 14, marginTop: 4 }}>
-              FIPE (grátis) · multa · monta · leilão · IPVA · gravame
+            <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.8 }}>
+              {CHECK_DEFS.length} verificações: cadastro · restrições · débitos · multas ·
+              RENAINF · RENAJUD · recall · roubo/furto · proprietários · leilão ·
+              remarketing · KM · FIPE · decodificação · sinistro · gravame
             </div>
           </div>
         )}
