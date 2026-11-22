@@ -11,7 +11,9 @@ const { SOURCES, seedSources } = require('@rv/scrapers/src/sources.js');
 const { exec } = require('child_process');
 
 const telegraf_module = require('telegraf');
-const bot = new telegraf_module.Telegraf(process.env.TELEGRAM_BOT_TOKEN);
+const bot = process.env.TELEGRAM_BOT_TOKEN
+  ? new telegraf_module.Telegraf(process.env.TELEGRAM_BOT_TOKEN)
+  : null;
 
 const db = getDb();
 
@@ -19,32 +21,37 @@ const THRESHOLD_DEFAULT = Number(process.env.DISCOUNT_MIN) || 30;
 const CHECK_INTERVAL_MS = Number(process.env.CHECK_INTERVAL) || 30 * 60 * 1000; // 30 min
 
 async function computeDiscount(listing) {
-  if (listing.discount_pct != null) return listing.discount_pct;
+  if (listing.discount_pct != null && listing.fipe_price != null) {
+    return { discount: listing.discount_pct, fipePrice: listing.fipe_price };
+  }
   const info = await lookupPrice({ brand: listing.brand, model: listing.model, year: listing.year ?? 2020 });
   if (!info) return null;
   if (listing.price == null) return null;
   const discount = Math.round(((info.price - listing.price) / info.price) * 100);
   // Atualiza o discount_pct no listing pra próxima vez ser rápido
   db.prepare('UPDATE listing SET discount_pct = ? WHERE id = ?').run(discount, listing.id);
-  return discount;
+  return { discount, fipePrice: info.price };
 }
 
 async function checkListing(listing) {
-  const discount = await computeDiscount(listing);
-  if (discount == null) return;
+  const result = await computeDiscount(listing);
+  if (!result) return;
+  const { discount, fipePrice } = result;
   if (discount < THRESHOLD_DEFAULT) return;
 
   // Verificar se já enviamos alerta pra esse listing + channel
   const already = db.prepare('SELECT * FROM alert WHERE listing_id = ? AND channel = ?').get(listing.id, 'telegram');
   if (already) return;
 
-  // Enviar alerta
-  const msg = '🚨 Oportunidade!\n' + listing.brand + ' ' + listing.model + ' ' + (listing.year ?? '?') + '\nPreço: R$' + listing.price + '\nFIPE: R$' + info.price + '\nDesconto: ' + discount + '%\n' + listing.url;
-  await bot.telegram.sendMessage(process.env.TELEGRAM_CHAT_ID, msg, { parse_mode: 'Markdown' });
+  // Enviar alerta (só se houver token configurado)
+  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+    const msg = '🚨 Oportunidade!\n' + listing.brand + ' ' + listing.model + ' ' + (listing.year ?? '?') + '\nPreço: R$' + listing.price + '\nFIPE: R$' + fipePrice + '\nDesconto: ' + discount + '%\n' + listing.url;
+    await bot.telegram.sendMessage(process.env.TELEGRAM_CHAT_ID, msg);
+  }
 
   // Registrar alerta
   db.prepare('INSERT INTO alert (listing_id, channel) VALUES (?, ?)').run(listing.id, 'telegram');
-  console.log('Alerta enviado: ' + listing.brand + ' ' + listing.model + ' desconto ' + discount + '%');
+  console.log('Alerta: ' + listing.brand + ' ' + listing.model + ' desconto ' + discount + '%');
 }
 
 async function runScrapeCycle() {
@@ -93,7 +100,12 @@ async function runScrapeCycle() {
 }
 
 // Executar na inicialização e depois no intervalo
-runScrapeCycle();
-setInterval(runScrapeCycle, CHECK_INTERVAL_MS);
+runScrapeCycle().then(() => {
+  if (process.argv.includes('--once')) {
+    console.log('Modo --once: encerrando após um ciclo.');
+    process.exit(0);
+  }
+  setInterval(runScrapeCycle, CHECK_INTERVAL_MS);
+});
 
 console.log('Worker rodando...');
