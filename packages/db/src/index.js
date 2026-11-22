@@ -132,6 +132,15 @@ function migrate(db) {
       'ALTER TABLE source ADD COLUMN meta_consecutive INTEGER NOT NULL DEFAULT 0',
     );
   }
+  const lcols = db.prepare('PRAGMA table_info(listing)').all();
+  const addListingCol = (name, ddl) => {
+    if (!lcols.some((c) => c.name === name)) {
+      db.exec(`ALTER TABLE listing ADD COLUMN ${name} ${ddl}`);
+    }
+  };
+  addListingCol('image', 'TEXT');        // URL da foto do anúncio
+  addListingCol('phone', 'TEXT');        // WhatsApp/telefone (E.164 com 55)
+  addListingCol('favorite', 'INTEGER NOT NULL DEFAULT 0');
 }
 
 export default getDb;
