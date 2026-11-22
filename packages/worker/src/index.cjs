@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const { getDb } = require('@rv/db');
-const { upsertListing, extractImage, extractPhone, extractPlate } = require('@rv/scrapers/src/listings.js');
+const { upsertListing, extractImage, extractPhone, extractPlate, extractTitle, extractBrand, extractModel, extractYear, extractPrice } = require('@rv/scrapers/src/listings.js');
 const { lookupPrice } = require('@rv/fipe');
 const { fetchHtml } = require('@rv/scrapers/src/fetch.js');
 const { SOURCES, seedSources } = require('@rv/scrapers/src/sources.js');
