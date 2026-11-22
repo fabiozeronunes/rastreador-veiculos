@@ -12,6 +12,8 @@ async function getListings(filters) {
       where.push("s.kind = 'auction'");
     } else if (filters.kind === 'classified') {
       where.push("s.kind = 'classified'");
+    } else if (filters.kind === 'repass') {
+      where.push("s.kind = 'repass'");
     }
     if (filters.model) {
       where.push('l.model = ?');
@@ -233,6 +235,7 @@ export default async function Home({ searchParams }) {
             <select name="tipo" defaultValue={filters.kind} style={{ ...select, marginTop: 4 }}>
               <option value="">Todos</option>
               <option value="auction">Leilão</option>
+              <option value="repass">Repasse</option>
               <option value="classified">Classificado</option>
             </select>
           </label>
@@ -343,7 +346,96 @@ export default async function Home({ searchParams }) {
           </div>
         )}
 
-        {/* fontes */}
+        {/* comparação FIPE × preço de venda */}
+      {listings.length > 0 && (
+        <section style={{ marginTop: 40 }}>
+          <h2 style={{ fontSize: 16, color: '#002f51', marginBottom: 12 }}>
+            💰 Comparativo: preço FIPE × preço de venda
+          </h2>
+          <div style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 8, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr style={{ background: '#002f51', color: '#fff', textAlign: 'left' }}>
+                  <th style={{ padding: '10px 12px' }}>Veículo</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>FIPE</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Venda</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Diferença</th>
+                  <th style={{ padding: '10px 12px', width: 180 }}>Barra</th>
+                </tr>
+              </thead>
+              <tbody>
+                {listings.map((l) => {
+                  const fipe = l.fipe_price;
+                  const venda = l.price;
+                  const diff = fipe != null && venda != null ? fipe - venda : null;
+                  const pct = diff != null && fipe > 0 ? Math.round((diff / fipe) * 100) : null;
+                  const pctWidth = pct != null ? Math.min(Math.abs(pct), 100) : 0;
+                  const below = diff != null && diff > 0;
+                  return (
+                    <tr key={l.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td style={{ padding: '10px 12px' }}>
+                        {l.brand} {l.model} {l.version || ''} · {l.year ?? '—'}
+                        <div style={{ fontSize: 12, color: '#888' }}>{l.source_name}</div>
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#666' }}>
+                        {fipe != null ? BRL(fipe) : '—'}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>
+                        {BRL(venda)}
+                      </td>
+                      <td
+                        style={{
+                          padding: '10px 12px',
+                          textAlign: 'right',
+                          fontWeight: 700,
+                          color: below ? '#2e9e44' : diff != null && diff < 0 ? '#d93025' : '#666',
+                        }}
+                      >
+                        {diff == null
+                          ? '—'
+                          : `${below ? '−' : '+'}${BRL(Math.abs(diff))} · ${below ? pct + '% abaixo' : Math.abs(pct) + '% acima'}`}
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        {pct == null ? (
+                          <span style={{ color: '#aaa', fontSize: 12 }}>sem FIPE</span>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div
+                              style={{
+                                flex: 1,
+                                height: 10,
+                                background: '#eee',
+                                borderRadius: 5,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: `${pctWidth}%`,
+                                  height: '100%',
+                                  background: below ? '#2e9e44' : '#d93025',
+                                }}
+                              />
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: below ? '#2e9e44' : '#d93025', minWidth: 38 }}>
+                              {pct}%
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+            Verde = venda abaixo do FIPE (oportunidade) · Vermelho = venda acima do FIPE
+          </div>
+        </section>
+      )}
+
+      {/* fontes */}
         <section style={{ marginTop: 40 }}>
           <h2 style={{ fontSize: 16, color: '#002f51' }}>Fontes monitoradas</h2>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

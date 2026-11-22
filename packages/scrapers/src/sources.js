@@ -41,6 +41,31 @@ export const SOURCES = [
     enabled: false, // ativa depois de validar bypass
     order: ['playwright', 'scrapfly', 'scrapingbee'],
   },
+  // --- Repasse (bancos/seguradoras) ---
+  {
+    id: 'leilao-bb',
+    name: 'Leilão Banco do Brasil',
+    kind: 'repass',
+    base_url: 'https://www.leilao.bb.com.br',
+    enabled: true,
+    order: ['fetch', 'playwright'],
+  },
+  {
+    id: 'leilao-caixa',
+    name: 'Leilão Caixa',
+    kind: 'repass',
+    base_url: 'https://www.leiloescaixa.com.br',
+    enabled: true,
+    order: ['fetch', 'playwright'],
+  },
+  {
+    id: 'leilao-santander',
+    name: 'Santander Leilões',
+    kind: 'repass',
+    base_url: 'https://www.santander.com.br/leiloes',
+    enabled: true,
+    order: ['fetch', 'playwright'],
+  },
 ];
 
 export function seedSources(db) {

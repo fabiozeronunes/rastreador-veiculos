@@ -28,8 +28,8 @@ async function computeDiscount(listing) {
   if (!info) return null;
   if (listing.price == null) return null;
   const discount = Math.round(((info.price - listing.price) / info.price) * 100);
-  // Atualiza o discount_pct no listing pra próxima vez ser rápido
-  db.prepare('UPDATE listing SET discount_pct = ? WHERE id = ?').run(discount, listing.id);
+  // Atualiza discount_pct e fipe_price no listing pra próxima vez ser rápido
+  db.prepare('UPDATE listing SET discount_pct = ?, fipe_price = ? WHERE id = ?').run(discount, info.price, listing.id);
   return { discount, fipePrice: info.price };
 }
 
