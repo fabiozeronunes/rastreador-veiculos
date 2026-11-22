@@ -66,15 +66,20 @@ export function extractTitle(html) {
 /** Extrai marca do anúncio (marca, manufacturer, ou padrão no título). */
 export function extractBrand(html) {
   if (!html) return null;
-  // Tenta padrões comuns de marca no HTML
+  // Tenta padrão HTML class="brand"
   const m = html.match(/<span[^>]*class=["']brand["'][^>]*>([^<]+)/i);
   if (m) return m[1].trim();
-  // Tenta no título: "Honda HR-V" → "Honda"
-  const titleMatch = html.match(/<[^>]+class=["']?title["']?[^>]*>([^<]{5,60})<\/[^>]+>/i);
-  if (titleMatch) {
-    const title = titleMatch[1].trim();
-    const brands = ['Honda', 'Fiat', 'Chevrolet', 'Volkswagen', 'Toyota', 'Ford', 'Renault', 'Peugeot', 'Citroen', 'Kia', 'Hyundai', 'Volvo', 'Audi', 'BMW', 'Mercedes'];
-    for (const b of brands) if (title.startsWith(b)) return b;
+  // Se já tivermos o title extraído (via input ou extractTitle), parseia ele
+  // "Fiat Argo 2021" → "Fiat", "HR-V 2019" → "Honda" (se title começar com marca conhecida)
+  const title = extractTitle(html);
+  if (title) {
+    const knownBrands = ['Honda', 'Fiat', 'Chevrolet', 'Volkswagen', 'Toyota', 'Ford', 'Renault', 'Peugeot', 'Citroen', 'Kia', 'Hyundai', 'Volvo', 'Audi', 'BMW', 'Mercedes', 'JAC', 'Chery', 'Caoa', 'Nissan', 'Mitsubishi'];
+    for (const b of knownBrands) {
+      if (title.startsWith(b + ' ') || title === b) return b;
+    }
+    // Fallback: pega a primeira palavra do título como marca
+    const firstWord = title.split(' ')[0];
+    if (firstWord.length >= 2) return firstWord;
   }
   return null;
 }
@@ -82,12 +87,32 @@ export function extractBrand(html) {
 /** Extrai modelo do anúncio (ex: HR-V, Corolla, Onix). */
 export function extractModel(html) {
   if (!html) return null;
-  // Tenta após a marca no título
-  const titleMatch = html.match(/<[^>]+class=["']?title["']?[^>]*>([^<]{5,60})<\/[^>]+>/i);
-  if (titleMatch) {
-    const title = titleMatch[1].trim();
-    const models = ['HR-V', 'Corolla', 'Onix', 'Civic', 'Ka', 'Sandero', 'Argo', 'Strada', 'Saveiro', 'Uno', 'Celta', 'Palio', 'Conex', 'Avante', 'Cerato', 'Optima', 'K5', 'Kona', 'Tucson', 'Sportage'];
-    for (const m of models) if (title.includes(m)) return m;
+  // Tenta após a marca no título extraído
+  const title = extractTitle(html);
+  if (title) {
+    // Remove a marca conhecida para deixar apenas o modelo
+    const knownBrands = ['Honda', 'Fiat', 'Chevrolet', 'Volkswagen', 'Toyota', 'Ford', 'Renault', 'Peugeot', 'Citroen', 'Kia', 'Hyundai', 'Volvo', 'Audi', 'BMW', 'Mercedes', 'JAC', 'Chery', 'Caoa', 'Nissan', 'Mitsubishi'];
+    let remaining = title;
+    for (const b of knownBrands) {
+      if (title.startsWith(b + ' ')) {
+        remaining = title.substring(b.length + 1);
+        break;
+      }
+    }
+    // Modelos conhecidos
+    const knownModels = ['HR-V', 'Corolla', 'Onix', 'Civic', 'Ka', 'Sandero', 'Argo', 'Strada', 'Saveiro', 'Uno', 'Celta', 'Palio', 'Conex', 'Avante', 'Cerato', 'Optima', 'K5', 'Kona', 'Tucson', 'Sportage', 'Creta', 'Ranger', 'Hilux', 'Strada'];
+    for (const mod of knownModels) {
+      if (remaining.includes(mod)) return mod;
+    }
+    // Fallback: pega a última palavra antes do ano ou fim da string
+    const parts = remaining.split(' ');
+    if (parts.length > 1) {
+      // Remove o último elemento se for ano (4 dígitos)
+      const last = parts[parts.length - 1];
+      if (last && !/^\d{4}$/.test(last)) return parts[parts.length - 1];
+      return parts[parts.length - 2];
+    }
+    return remaining;
   }
   return null;
 }
