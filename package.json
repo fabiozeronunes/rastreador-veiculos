@@ -14,7 +14,7 @@
     "scrape": "node apps/api/src/runner/scrape.js",
     "api": "node apps/api/src/server.js",
     "dev": "node apps/api/src/server.js",
-    "start": "node packages/worker/src/index.js"
+    "start": "node packages/worker/src/index.cjs"
   },
   "engines": {
     "node": ">=22"

@@ -1,4 +1,5 @@
 node_modules/
+.next/
 *.log
 data/*.db
 data/*.db-journal
@@ -6,3 +7,5 @@ data/*.db-wal
 data/*.db-shm
 .env
 .DS_Store
+.vercel
+.env*
