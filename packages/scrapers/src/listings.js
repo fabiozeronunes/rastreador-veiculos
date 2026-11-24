@@ -3,6 +3,50 @@ import { getDb } from '@rv/db';
 
 const hash = (s) => createHash('sha1').update(s).digest('hex').slice(0, 20);
 
+/** DB lookup assíncrono de marca - pode ser chamado separadamente */
+export async function lookupBrandFromDb(html) {
+  const title = extractTitle(html);
+  if (!title) return null;
+  const db = getDb();
+  const brandRow = db.prepare('SELECT id, name FROM brands WHERE is_active = 1 AND name = ?').get(title.split(' ')[0]);
+  if (brandRow) return brandRow.name;
+  // Fallback: tenta conhecidas pelo título
+  const known = ['Honda', 'Fiat', 'Chevrolet', 'Volkswagen', 'Toyota', 'Ford', 'Renault', 'Peugeot', 'Citroen', 'Kia', 'Hyundai', 'Volvo', 'Audi', 'BMW', 'Mercedes', 'JAC', 'Chery', 'Caoa', 'Nissan', 'Mitsubishi'];
+  for (const b of known) {
+    if (title.startsWith(b + ' ') || title === b) return b;
+  }
+  const firstWord = title.split(' ')[0];
+  if (firstWord.length >= 2) return firstWord;
+  return null;
+}
+
+/** DB lookup assíncrono de modelo - pode ser chamado separadamente */
+export async function lookupModelFromDb(html) {
+  const title = extractTitle(html);
+  if (!title) return null;
+  const brandName = title.split(' ')[0];
+  const db = getDb();
+  // Pega o brand_id pelo nome e busca modelos associados
+  const brandRow = db.prepare('SELECT id FROM brands WHERE name = ?').get(brandName);
+  if (!brandRow) return null;
+  const modelRow = db.prepare('SELECT name FROM models WHERE brand_id = ? AND is_active = 1').all(brandRow.id).map(r => r.name);
+  if (modelRow.length > 0) return modelRow[0];
+  // Fallback simples: pega a parte após a marca no título
+  const remaining = title.replace(brandName + ' ', '');
+  const knownModels = ['HR-V', 'Corolla', 'Onix', 'Civic', 'Ka', 'Sandero', 'Argo', 'Strada', 'Saveiro', 'Uno', 'Celta', 'Palio', 'Conex', 'Avante', 'Cerato', 'Optima', 'K5', 'Kona', 'Tucson', 'Sportage', 'Creta', 'Ranger', 'Hilux', 'Strada'];
+  for (const mod of knownModels) {
+    if (remaining.includes(mod)) return mod;
+  }
+  // Fallback: última palavra antes do ano
+  const parts = remaining.split(' ');
+  if (parts.length > 1) {
+    const last = parts[parts.length - 1];
+    if (last && !/^\d{4}$/.test(last)) return parts[parts.length - 1];
+    return parts[parts.length - 2];
+  }
+  return null;
+}
+
 /** Extrai URL de imagem do HTML do anúncio (og:image > twitter:image > 1ª img). */
 export function extractImage(html) {
   if (!html) return null;
@@ -63,56 +107,41 @@ export function extractTitle(html) {
   return null;
 }
 
-/** Extrai marca do anúncio (marca, manufacturer, ou padrão no título). */
+/** Extrai marca do anúncio usando heurística (síncrona - usada pelo worker). */
 export function extractBrand(html) {
-  if (!html) return null;
-  // Tenta padrão HTML class="brand"
-  const m = html.match(/<span[^>]*class=["']brand["'][^>]*>([^<]+)/i);
-  if (m) return m[1].trim();
-  // Se já tivermos o title extraído (via input ou extractTitle), parseia ele
-  // "Fiat Argo 2021" → "Fiat", "HR-V 2019" → "Honda" (se title começar com marca conhecida)
   const title = extractTitle(html);
-  if (title) {
-    const knownBrands = ['Honda', 'Fiat', 'Chevrolet', 'Volkswagen', 'Toyota', 'Ford', 'Renault', 'Peugeot', 'Citroen', 'Kia', 'Hyundai', 'Volvo', 'Audi', 'BMW', 'Mercedes', 'JAC', 'Chery', 'Caoa', 'Nissan', 'Mitsubishi'];
-    for (const b of knownBrands) {
-      if (title.startsWith(b + ' ') || title === b) return b;
-    }
-    // Fallback: pega a primeira palavra do título como marca
-    const firstWord = title.split(' ')[0];
-    if (firstWord.length >= 2) return firstWord;
+  if (!title) return null;
+  const knownBrands = ['Honda', 'Fiat', 'Chevrolet', 'Volkswagen', 'Toyota', 'Ford', 'Renault', 'Peugeot', 'Citroen', 'Kia', 'Hyundai', 'Volvo', 'Audi', 'BMW', 'Mercedes', 'JAC', 'Chery', 'Caoa', 'Nissan', 'Mitsubishi'];
+  for (const b of knownBrands) {
+    if (title.startsWith(b + ' ') || title === b) return b;
   }
+  const firstWord = title.split(' ')[0];
+  if (firstWord.length >= 2) return firstWord;
   return null;
 }
 
-/** Extrai modelo do anúncio (ex: HR-V, Corolla, Onix). */
+/** Extrai modelo do anúncio usando heurística (síncrona - usada pelo worker). */
 export function extractModel(html) {
-  if (!html) return null;
-  // Tenta após a marca no título extraído
   const title = extractTitle(html);
-  if (title) {
-    // Remove a marca conhecida para deixar apenas o modelo
-    const knownBrands = ['Honda', 'Fiat', 'Chevrolet', 'Volkswagen', 'Toyota', 'Ford', 'Renault', 'Peugeot', 'Citroen', 'Kia', 'Hyundai', 'Volvo', 'Audi', 'BMW', 'Mercedes', 'JAC', 'Chery', 'Caoa', 'Nissan', 'Mitsubishi'];
-    let remaining = title;
-    for (const b of knownBrands) {
-      if (title.startsWith(b + ' ')) {
-        remaining = title.substring(b.length + 1);
-        break;
-      }
+  if (!title) return null;
+  const knownBrands = ['Honda', 'Fiat', 'Chevrolet', 'Volkswagen', 'Toyota', 'Ford', 'Renault', 'Peugeot', 'Citroen', 'Kia', 'Hyundai', 'Volvo', 'Audi', 'BMW', 'Mercedes', 'JAC', 'Chery', 'Caoa', 'Nissan', 'Mitsubishi'];
+  let remaining = title;
+  for (const b of knownBrands) {
+    if (title.startsWith(b + ' ')) {
+      remaining = title.substring(b.length + 1);
+      break;
     }
-    // Modelos conhecidos
-    const knownModels = ['HR-V', 'Corolla', 'Onix', 'Civic', 'Ka', 'Sandero', 'Argo', 'Strada', 'Saveiro', 'Uno', 'Celta', 'Palio', 'Conex', 'Avante', 'Cerato', 'Optima', 'K5', 'Kona', 'Tucson', 'Sportage', 'Creta', 'Ranger', 'Hilux', 'Strada'];
-    for (const mod of knownModels) {
-      if (remaining.includes(mod)) return mod;
-    }
-    // Fallback: pega a última palavra antes do ano ou fim da string
-    const parts = remaining.split(' ');
-    if (parts.length > 1) {
-      // Remove o último elemento se for ano (4 dígitos)
-      const last = parts[parts.length - 1];
-      if (last && !/^\d{4}$/.test(last)) return parts[parts.length - 1];
-      return parts[parts.length - 2];
-    }
-    return remaining;
+  }
+  const knownModels = ['HR-V', 'Corolla', 'Onix', 'Civic', 'Ka', 'Sandero', 'Argo', 'Strada', 'Saveiro', 'Uno', 'Celta', 'Palio', 'Conex', 'Avante', 'Cerato', 'Optima', 'K5', 'Kona', 'Tucson', 'Sportage', 'Creta', 'Ranger', 'Hilux', 'Strada'];
+  for (const mod of knownModels) {
+    if (remaining.includes(mod)) return mod;
+  }
+  // Fallback: última palavra antes do ano
+  const parts = remaining.split(' ');
+  if (parts.length > 1) {
+    const last = parts[parts.length - 1];
+    if (last && !/^\d{4}$/.test(last)) return parts[parts.length - 1];
+    return parts[parts.length - 2];
   }
   return null;
 }
@@ -145,8 +174,11 @@ export function extractPrice(html) {
 /**
  * Upsert de um anúncio. Retorna { listing, isNew, priceChanged }.
  * Dedup por (source_id, external_id).
+ * 
+ * Nota: brand e model vêm como parâmetro input. Se não vierem, são extraídos
+ * sinteticamente do título usando listas conhecidas + lookup opcional DB via lookupBrandFromDb/lookupModelFromDb (async).
  */
-export function upsertListing(input) {
+export async function upsertListing(input) {
   const db = getDb();
   const id = hash(`${input.source_id}:${input.external_id}`);
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
@@ -158,6 +190,12 @@ export function upsertListing(input) {
   const image = input.image ?? extractImage(html);
   const phone = input.phone ?? extractPhone(html);
   const plate = input.plate ?? extractPlate(html);
+
+  // Marca e modelo: usa o do input, ou extrai sinteticamente do título (sync fallback)
+  // Para enriquecimento com DB, recomenda-se chamar lookupBrandFromDb/lookupModelFromDb
+  // antes de primeira inserção ou deixar para o próximo ciclo.
+  let brand = input.brand ?? extractBrand(html);
+  let model = input.model ?? extractModel(html);
 
   if (!existing) {
     db.prepare(
@@ -171,8 +209,8 @@ export function upsertListing(input) {
       String(input.external_id),
       input.url,
       input.title ?? null,
-      input.brand ?? null,
-      input.model ?? null,
+      brand ?? null,
+      model ?? null,
       input.version ?? null,
       input.year ?? null,
       input.price ?? null,
@@ -203,8 +241,8 @@ export function upsertListing(input) {
   ).run(
     input.url,
     input.title ?? null,
-    input.brand ?? null,
-    input.model ?? null,
+    brand ?? null,
+    model ?? null,
     input.version ?? null,
     input.year ?? null,
     input.price ?? null,
