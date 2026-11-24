@@ -175,6 +175,22 @@ export default async function Home({ searchParams }) {
             <span style={{ fontSize: 13, opacity: 0.85 }}>
               {listings.length} anúncio(s)
             </span>
+            <a
+              href="/cadastrar-marca"
+              style={{
+                marginLeft: 12,
+                background: 'rgba(255,255,255,.15)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,.4)',
+                borderRadius: 20,
+                padding: '6px 14px',
+                fontSize: 13,
+                fontWeight: 700,
+                textDecoration: 'none',
+              }}
+            >
+              📝 Cadastrar
+            </a>
           </div>
         </div>
       </header>
