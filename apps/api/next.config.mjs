@@ -7,4 +7,5 @@ export default {
     // Remove this if you have issues running your site on Vercel
     ignoreBuildErrors: true,
   },
+  swcMinify: false,
 };

@@ -9,3 +9,6 @@ data/*.db-shm
 .DS_Store
 .vercel
 .env*
+*.bak
+*.full
+apps/api/data/

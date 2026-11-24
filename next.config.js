@@ -1,7 +1,7 @@
-/** next.config.js — configuração mínima para Vercel (pages router) */
-const future = {
-  webpack5: true,
-  // enable React 18 features
+/** next.config.js — configuração mínima para Vercel (app router) */
+export default {
   reactStrictMode: true,
+  experimental: {
+    appDir: true,
+  },
 };
-export default future;
