@@ -1,0 +1,18 @@
+[Unit]
+Description=Rastreador Veiculos - Túnel Cloudflare (acesso externo)
+After=rastreador-web.service
+Wants=rastreador-web.service
+
+[Service]
+Type=simple
+User=fabionunes
+Group=fabionunes
+Environment=HOME=/home/fabionunes
+ExecStart=/bin/bash /home/fabionunes/rastreador-veiculos/deploy/tunnel.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
